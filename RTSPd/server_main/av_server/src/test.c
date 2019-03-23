@@ -99,8 +99,6 @@ int thread_run_flag = 1;
 MSA_HANDLE rtsp_handle = NULL;
 
 extern void lprint(char *origin, char *new_string, char *old_string, unsigned int BitbmpPix_X, int x, int y, char *buffer);
-extern void *i2c_loop(void *pArgs);
-extern void i2c_get_init_data(unsigned short cmd, unsigned char *pbuf);
 
 int  GF_VENC_RequestIFrame(unsigned char nCh, unsigned char nMinEnc, unsigned char nIFrameCount)
 {
@@ -764,25 +762,16 @@ int rtspc_init(int idx, int screen_w, int screen_h)
 	int i;
 	int ret = 0;
 	int x,y,w,h;
-	unsigned char buf[256];
 	unsigned short cmd;
 
 	if (idx >= STREAM_NUM) 
 		return;
 
 	cmd = 0x0100 | idx;
-	i2c_get_init_data(cmd, buf);
-	//for (i = 0; i < 19; i++)
-		//printf("%d, ", ((int *)buf)[i]);
-	//printf("\n");
-
-	rc_stream[idx].idx = idx;
-	//rc_stream[idx].status = S_UNINIT;
-	//rc_stream[idx].have_vd = 0;
-	//rc_stream[idx].rtsp_fd = -1;
-	rc_stream[idx].status = ((int *)buf)[0];
-	rc_stream[idx].have_vd = ((int *)buf)[1];
-	rc_stream[idx].rtsp_fd = ((int *)buf)[2];
+    rc_stream[idx].idx = idx;
+	rc_stream[idx].status = S_UNINIT;
+	rc_stream[idx].have_vd = 0;
+	rc_stream[idx].rtsp_fd = -1;
 	memset(rc_stream[idx].rtsp.rtsp_addr, 0, sizeof(rc_stream[idx].rtsp.rtsp_addr));
 	memset(rc_stream[idx].rtsp.pass, 0, sizeof(rc_stream[idx].rtsp.pass));
 	memset(rc_stream[idx].rtsp.user, 0, sizeof(rc_stream[idx].rtsp.user));
@@ -791,21 +780,13 @@ int rtspc_init(int idx, int screen_w, int screen_h)
 		return 0;
 	}
 
-	//rc_stream[idx].encode_create = 0;
-	//rc_stream[idx].stEncodeSet.enRc = VENC_RC_CBR;
-	//rc_stream[idx].stEncodeSet.iBitrate = 4096;
-	//rc_stream[idx].stEncodeSet.iFrameRate = 30;
-	//rc_stream[idx].stEncodeSet.iGop = 30;
-	//rc_stream[idx].stEncodeSet.iWidth = 0;
-	//rc_stream[idx].stEncodeSet.iHeight = 0;
-	
-	rc_stream[idx].encode_create = ((int *)buf)[3];
-	rc_stream[idx].stEncodeSet.enRc = ((int *)buf)[4];
-	rc_stream[idx].stEncodeSet.iBitrate = ((int *)buf)[5];
-	rc_stream[idx].stEncodeSet.iFrameRate = ((int *)buf)[6];
-	rc_stream[idx].stEncodeSet.iGop = ((int *)buf)[7];
-	rc_stream[idx].stEncodeSet.iWidth = ((int *)buf)[8];
-	rc_stream[idx].stEncodeSet.iHeight = ((int *)buf)[9];
+	rc_stream[idx].encode_create = 0;
+	rc_stream[idx].stEncodeSet.enRc = VENC_RC_CBR;
+	rc_stream[idx].stEncodeSet.iBitrate = 4096;
+	rc_stream[idx].stEncodeSet.iFrameRate = 30;
+	rc_stream[idx].stEncodeSet.iGop = 30;
+	rc_stream[idx].stEncodeSet.iWidth = 0;
+	rc_stream[idx].stEncodeSet.iHeight = 0;
 	
 	rc_stream[idx].stEncodeSet.DataCallback = enc_data_callback;
 
@@ -815,22 +796,15 @@ int rtspc_init(int idx, int screen_w, int screen_h)
 		return -1;
 	}
 
-	//get_win_pos(idx, &x, &y, &w, &h);
+	get_win_pos(idx, &x, &y, &w, &h);
 
 	//¶Ô´°¿Ú»­±ß¿ò
-	//rc_stream[idx].stChannel.stWindow.iPosStartX = x;
-	//rc_stream[idx].stChannel.stWindow.iPosStartY = y;
-	//rc_stream[idx].stChannel.stWindow.iWidth = w;
-	//rc_stream[idx].stChannel.stWindow.iHeight = h;
-	//rc_stream[idx].stChannel.enOutputDev = MSA_HD0;
-	//rc_stream[idx].stChannel.enShowLayer = MSA_PIP_LAYER;
-
-	rc_stream[idx].stChannel.stWindow.iPosStartX = ((int *)buf)[10];
-	rc_stream[idx].stChannel.stWindow.iPosStartY = ((int *)buf)[11];
-	rc_stream[idx].stChannel.stWindow.iWidth = ((int *)buf)[12];
-	rc_stream[idx].stChannel.stWindow.iHeight = ((int *)buf)[13];
-	rc_stream[idx].stChannel.enOutputDev =  ((int *)buf)[14];
-	rc_stream[idx].stChannel.enShowLayer =  ((int *)buf)[15];
+	rc_stream[idx].stChannel.stWindow.iPosStartX = x;
+	rc_stream[idx].stChannel.stWindow.iPosStartY = y;
+	rc_stream[idx].stChannel.stWindow.iWidth = w;
+	rc_stream[idx].stChannel.stWindow.iHeight = h;
+	rc_stream[idx].stChannel.enOutputDev = MSA_HD0;
+	rc_stream[idx].stChannel.enShowLayer = MSA_PIP_LAYER;
 
 	ret = MSA_CreateChanWindow(rc_stream[idx].stChannel, &rc_stream[idx].handle);
 	if( ret != MSA_SUCCESS )
@@ -840,12 +814,9 @@ int rtspc_init(int idx, int screen_w, int screen_h)
 		return -1;
 	}
 
-	//show_chan = STREAM_NUM;
-	//rc_stream[idx].status = S_UNLINK;
-	//rc_stream[idx].timer = 0;
-	show_chan =  ((int *)buf)[16];
-	rc_stream[idx].status =  ((int *)buf)[17];
-	rc_stream[idx].timer =  ((int *)buf)[18];
+	show_chan = STREAM_NUM;
+	rc_stream[idx].status = S_UNLINK;
+	rc_stream[idx].timer = 0;
 
 	return 0;
 }
@@ -898,28 +869,16 @@ void *rtsp_client(void *pArgs)
 	int ret = 0;
 	int i = 0;
 	pthread_t VThread;
-	pthread_t   i2c_Thread;
-	unsigned char buf[256];
 
 	printf("rtsp_client -->\n");
-
 	memset(rc_stream, 0, sizeof(rc_stream));
 	memset(&stInitDev, 0x00, sizeof(stInitDev));
 	
-	i2c_get_init_data(0x0000, buf);
-	//stInitDev.stOutputDevSetParameters.iOutputDevNum = 1;
-	//stInitDev.stOutputDevSetParameters.enOutputScreenMode[0]  = MSA_VO_OUTPUT_1024x768_60;
-	//stInitDev.stOutputDevSetParameters.iDevIntfType[0] =  MSA_VO_INTF_VGA|MSA_VO_INTF_HDMI;
-	//stInitDev.stOutputDevSetParameters.iDevCombineMode[0] = MSA_HARDWARE_COMBINE_MODE;
-	//stInitDev.stOutputDevSetParameters.iPipLayerBindDevId = MSA_HD0;
-	/*for (i = 0; i < 5; i++)
-		printf("%d, ", ((int *)buf)[i]);
-	printf("\n"); */
-	stInitDev.stOutputDevSetParameters.iOutputDevNum = ((int *)buf)[0];
-	stInitDev.stOutputDevSetParameters.enOutputScreenMode[0]  = ((int *)buf)[1];
-	stInitDev.stOutputDevSetParameters.iDevIntfType[0] = ((int *)buf)[2];
-	stInitDev.stOutputDevSetParameters.iDevCombineMode[0] = ((int *)buf)[3];
-	stInitDev.stOutputDevSetParameters.iPipLayerBindDevId = ((int *)buf)[4];
+	stInitDev.stOutputDevSetParameters.iOutputDevNum = 1;
+	stInitDev.stOutputDevSetParameters.enOutputScreenMode[0]  = MSA_VO_OUTPUT_1024x768_60;
+	stInitDev.stOutputDevSetParameters.iDevIntfType[0] =  MSA_VO_INTF_VGA|MSA_VO_INTF_HDMI;
+	stInitDev.stOutputDevSetParameters.iDevCombineMode[0] = MSA_HARDWARE_COMBINE_MODE;
+	stInitDev.stOutputDevSetParameters.iPipLayerBindDevId = MSA_HD0;
 
 	pthread_mutex_init(&mutex, NULL);
 	
@@ -947,9 +906,6 @@ void *rtsp_client(void *pArgs)
 	set_chn1_down();
 	set_chn2_down();
 
-	/* i2c communication */
-	pthread_create(&i2c_Thread, 0, i2c_loop, NULL);
-	
 	while (thread_run_flag) {
 		for (i = 0; i < STREAM_NUM; i++) {
 			switch (rc_stream[i].status) {
