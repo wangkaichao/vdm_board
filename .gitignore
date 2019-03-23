@@ -1,0 +1,11 @@
+RTSPd/libipnc/src/objs/
+RTSPd/libkeyboard/build/
+RTSPd/libkeyboard/*.o
+RTSPd/libkeyboard/*.a
+RTSPd/libkeyboard/*.so
+RTSPd/RajDecMac/src/*.o
+RTSPd/RajDecMac/src/*.a
+RTSPd/RajDecMac/src/*.so
+RTSPd/server_main/av_server/src/objs/
+RTSPd/build/exes/
+

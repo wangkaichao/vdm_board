@@ -1,0 +1,320 @@
+ /******************************************************************************
+* °æÈ¨ÐÅÏ¢£º
+* ÏµÍ³Ãû³Æ£º
+* ÎÄ¼þÃû³Æ£ºGFNet.h
+* ÎÄ¼þËµÃ÷£º¸ÃÎÄ¼þ¶¨ÒåÁË¶ÔÍâµÄÊý¾Ý½á¹¹ºÍº¯Êý½Ó¿Ú
+
+* ¸üÐÂËµÃ÷£º20090409£º	ÐÞ¸ÄµÇÂ¼ÓÃ»§Êý£¬¿ÉÒÔÍ¬Ê±µÇÂ¼16ÈË
+						µ÷ÕûÁ¬½ÓÖÐÐÄÄ£Ê½£¬ÐÞ¸Ä²¿·ÖÍ¬²½Ôì³ÉµÄ²»ÎÈ¶¨ÎÊÌâ
+
+			20090415	µ÷ÕûÁËÒ»¸ö½ÓÊÕÒì²½£¬ÐÞ¸Ä½»»¥Òì²½¿ÉÄÜÔì³ÉµÄ²»ÎÈ¶¨
+
+			20110421    ÐÞ¸ÄµÇÂ¼´®¿ÚÊý¾Ý·¢ËÍºÍ±¨¾¯µÈ·¢ËÍ²¿·Ö
+						Ôö¼ÓÒ»¸ösocket ½øµÇÂ¼µÄselect socketÁÐ±í£¬ÔÚÓÐ´®¿ÚÊý¾ÝºÍ±¨¾¯ÐèÒª
+						·¢ËÍ¸øPCµÄÊ±ºò£¬Í¨¹ý·¢ËÍÊý¾Ýµ½ÐÂsocket ¿ìËÙ»½ÐÑselect×èÈû£¬
+						½øÐÐ´®¿ÚÊý¾ÝºÍ±¨¾¯µÄ·¢ËÍ
+			20110805    1£¬ÐÞ¸ÄµÇÂ¼´®¿ÚÊý¾Ý·¢ËÍ·½Ê½£¬¸ÄÕýÁËÒÔÇ°ÔÚ¶àÓÃ»§µÇÂ¼µÄÊ±ºò´®¿ÚÊý¾ÝÖ»·¢ËÍÖÐÐÄIPµÄÇé¿ö£¬
+							Êý¾Ý·¢¸øËùÓÐµÇÂ¼ÓÃ»§
+						2£¬Ôö¼ÓÍ¼Æ¬·¢ËÍ½Ó¿Ú
+			20120224	ÐÞ¸ÄUPNP£¬ÊÊÓ¦D-LINKµÄ¶Ë¿ÚÓ³ÉäÎÊÌâ
+******************************************************************************/
+
+#ifndef		GF_SERVER_NET_H_
+#define		GF_SERVER_NET_H_
+
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <errno.h>
+#include <pthread.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/time.h>
+#include <netinet/tcp.h>
+#include <fcntl.h>
+#include <time.h>
+
+/////////////////////////**********************ºê¶¨Òå
+#define USER_NAME_LENGTH_IN		16
+#define USER_PSW_LENGTH_IN		16
+
+/////////////////////////**********************Êý¾Ý½á¹¹
+
+//ÕìÍ·
+typedef struct _MP4_FRAME_HEAD
+{
+	unsigned int 	nMagicCode;
+	unsigned int	nTimeTick;
+	unsigned int	nVideoSize;
+	unsigned int	bKeyFrame;
+	unsigned int	nAudioSize;
+	unsigned int	nReserve;	
+}MP4_FRAME_HEAD,*PMP4_FRAME_HEAD;
+
+typedef enum _GFERR_CODE
+{
+	GFERR_SUCCESS,					//²Ù×÷³É¹¦
+	GFERR_FAILURE,					//²Ù×÷Ê§°Ü
+	GFERR_REFUSE_REQ,				//ÇëÇó±»¾Ü¾ø
+	GFERR_USER_FULL,				//µÇÂ¼ÓÃ»§ÒÑÂú
+	GFERR_PREVIEW_FULL,				//Ô¤ÀÀÓÃ»§ÒÑÂú
+	GFERR_TASK_FULL,				//ÏµÍ³ÈÎÎñ·±Ã¦£¬´ý»á³¢ÊÔÁ¬½Ó
+	GFERR_CHANNEL_NOT_EXIST,		//Òª´ò¿ªµÄÍ¨µÀ²»´æÔÚ»òÒÑÂú
+	GFERR_DEVICE_NAME,				//´ò¿ªµÄÉè±¸²»´æÔÚ
+	GFERR_IS_TALKING,				//ÕýÔÚ¶Ô½²
+	GFERR_QUEUE_FAILUE,				//¶ÓÁÐ³ö´í
+	GFERR_USER_PASSWORD,			//ÓÃ»§Ãû»òÃÜÂëºÍÏµÍ³²»Æ¥Åä
+	GFERR_SHARE_SOCKET,
+	GFERR_RELAY_NOT_OPEN,
+	GFERR_RELAY_MULTI_PORT,
+	GFERR_CAPTURE_OVERTIME,
+	
+	GFERR_INVALID_PARAMETER=100,	//ÊäÈë²ÎÊýÎÞÐ§
+	GFERR_LOGON_FAILURE,			//µÇÂ¼Ê§°Ü
+	GFERR_TIME_OUT,					//²Ù×÷³¬Ê±
+	GFERR_SOCKET_ERR,				//SOCKET´íÎó
+	GFERR_NOT_LINKSERVER,			//»¹Î´Á¬½Ó·þÎñÆ÷
+	GFERR_BUFFER_EXTCEED_LIMIT,		//Ê¹ÓÃ»º³å³¬¹ýÏÞÖÆ	
+	GFERR_LOW_PRIORITY,				//²Ù×÷È¨ÏÞ²»×ã
+	GFERR_BUFFER_SMALL,				//»º³åÌ«Ð¡
+	GFERR_IS_BUSY,					//ÏµÍ³ÈÎÎñÕýÃ¦
+	GFERR_UPDATE_FILE,				//Éý¼¶ÎÄ¼þ´íÎó
+	GFERR_UPDATE_UNMATCH,			//Éý¼¶ÎÄ¼þºÍ»úÆ÷²»Æ¥Åä
+	GFERR_PORT_INUSE,				//¶Ë¿Ú±»Õ¼ÓÃ
+	GFERR_RELAY_DEVICE_EXIST,		//
+
+    //2007.6.13
+	GFERR_CONNECT_REFUSED,			//Á¬?ÓÊ±±»?Ü?
+	GFERR_PROT_NOT_SURPPORT,		//²»Ö§³Ö?
+
+	GFERR_FILE_OPEN_ERR,            //?ò¿ªÎÄ?
+	GFERR_FILE_SEEK_ERR,            //fseek
+	GFERR_FILE_WRITE_ERR,           //fwrite
+	GFERR_FILE_READ_ERR,            //fread
+	GFERR_FILE_CLOSING,             //            
+}GFERR_CODE;
+
+//Í¨ÖªÓ¦ÓÃ³ÌÐò´°¿ÚÏûÏ¢ÃüÁî
+typedef enum _GFMSG_NOTIFY
+{
+	GFMSG_CONNECT_CLOSE,			//µÇÂ¼Á¬½Ó¹Ø±Õ
+	GFMSG_CHANNEL_CLOSE,			//Í¨µÀÁ¬½Ó¹Ø±Õ
+	GFMSG_TALK_CLOSE,				//¶Ô½²Á¬½Ó¹Ø±Õ
+	GFMSG_ALARM_OUTPUT,				//±¨¾¯Êä³ö
+	GFMSG_UPDATE_SEND_PERCENT,		//Éý¼¶³ÌÐò·¢ËÍ°Ù·Ö±È
+	GFMSG_UPDATE_SAVE_PERCENT,		//Éý¼¶Ð´Èë·¢ËÍ°Ù·Ö±È
+	GFMSG_BROADCAST_CLOSE,			//ÓïÒô¹ã²¥ÖÐÒ»¸ö¶Ï¿ª
+	GFMSG_SENSOR_CAPTURE,			//Ì½Í·´¥·¢µÄ×¥ÅÄ
+	GFMSG_COM_DATA,					//´®¿Ú²É¼¯Êý¾Ý
+}GFMSG_NOTIFY;
+
+typedef enum _GFCMD_NET
+{
+	GFCMD_GET_ALL_PARAMETER,		//0. µÃµ½ËùÓÐ±àÂëÆ÷²ÎÊý
+	GFCMD_SET_DEFAULT_PARAMETER,	//1. »Ö¸´ËùÓÐ±àÂëÆ÷Ä¬ÈÏ²ÎÊý
+	GFCMD_SET_RESTART_DVS,			//2. ÖØÆô±àÂëÆ÷
+	GFCMD_GET_SYS_CONFIG,			//3. »ñÈ¡ÏµÍ³ÉèÖÃ
+	GFCMD_SET_SYS_CONFIG,			//4. ÉèÖÃÏµÍ³ÉèÖÃ
+	GFCMD_GET_TIME,					//5. »ñÈ¡±àÂëÆ÷Ê±¼ä
+	GFCMD_SET_TIME,					//6. ÉèÖÃ±àÂëÆ÷Ê±¼ä
+	GFCMD_GET_AUDIO_CONFIG,			//7. »ñÈ¡ÒôÆµÉèÖÃ
+	GFCMD_SET_AUDIO_CONFIG,			//8. ÉèÖÃÒôÆµÉèÖÃ
+	GFCMD_GET_VIDEO_CONFIG,			//9. »ñÈ¡ÊÓÆµÉèÖÃ
+	GFCMD_SET_VIDEO_CONFIG,			//10.ÉèÖÃÊÓÆµÉèÖÃ
+	GFCMD_GET_VMOTION_CONFIG,		//11.»ñÈ¡ÒÆ¶¯Õì²âÉèÖÃ
+	GFCMD_SET_VMOTION_CONFIG,		//12.ÉèÖÃÒÆ¶¯Õì²âÉèÖÃ
+	GFCMD_GET_VMASK_CONFIG,			//13.»ñÈ¡Í¼ÏñÆÁ±ÎÉèÖÃ
+	GFCMD_SET_VMASK_CONFIG,			//14.ÉèÖÃÍ¼ÏñÆÁ±ÎÉèÖÃ
+	GFCMD_GET_VLOST_CONFIG,			//15.»ñÈ¡ÊÓÆµ¶ªÊ§ÉèÖÃ
+	GFCMD_SET_VLOST_CONFIG,			//16.ÉèÖÃÊÓÆµ¶ªÊ§ÉèÖÃ
+	GFCMD_GET_SENSOR_ALARM,			//17.»ñÈ¡Ì½Í·±¨¾¯Õì²âÉèÖÃ
+	GFCMD_SET_SENSOR_ALARM,			//18.ÉèÖÃÌ½Í·±¨¾¯Õì²âÉèÖÃ
+	GFCMD_GET_USER_CONFIG,			//19.»ñÈ¡ÓÃ»§ÉèÖÃ
+	GFCMD_SET_USER_CONFIG,			//20.ÉèÖÃÓÃ»§ÉèÖÃ
+	GFCMD_GET_NET_CONFIG,			//21.»ñÈ¡ÍøÂçÉèÖÃ½á¹¹
+	GFCMD_SET_NET_CONFIG,			//22.ÉèÖÃÍøÂçÉèÖÃ½á¹¹
+	GFCMD_GET_COM_CONFIG,			//23.»ñÈ¡´®¿ÚÉèÖÃ
+	GFCMD_SET_COM_CONFIG,			//24.ÉèÖÃ´®¿ÚÉèÖÃ
+	GFCMD_GET_YUNTAI_CONFIG,		//25.»ñÈ¡ÄÚÖÃÔÆÌ¨ÐÅÏ¢
+	GFCMD_SET_YUNTAI_CONFIG,		//26.ÉèÖÃÄÚÖÃÔÆÌ¨ÐÅÏ¢
+	GFCMD_GET_VIDEO_SIGNAL_CONFIG,	//27.»ñÈ¡ÊÓÆµÐÅºÅ²ÎÊý£¨ÁÁ¶È¡¢É«¶È¡¢¶Ô±È¶È¡¢±¥ºÍ¶È£©
+	GFCMD_SET_VIDEO_SIGNAL_CONFIG,	//28.ÉèÖÃÊÓÆµÐÅºÅ²ÎÊý£¨ÁÁ¶È¡¢É«¶È¡¢¶Ô±È¶È¡¢±¥ºÍ¶È£©
+	GFCMD_SET_PAN_CTRL,				//29.ÔÆÌ¨¿ØÖÆ
+	GFCMD_SET_COMM_SENDDATA,		//30.Í¸Ã÷Êý¾Ý´«Êä
+	GFCMD_SET_COMM_START_GETDATA,	//31.¿ªÊ¼²É¼¯Í¸Ã÷Êý¾Ý
+	GFCMD_SET_COMM_STOP_GETDATA,	//32.Í£Ö¹²É¼¯Í¸Ã÷Êý¾Ý
+	GFCMD_SET_OUTPUT_CTRL,			//33.¼ÌµçÆ÷¿ØÖÆ
+	GFCMD_SET_PRINT_DEBUG,			//34.µ÷ÊÔÐÅÏ¢¿ª¹Ø
+	GFCMD_SET_ALARM_CLEAR,			//35.Çå³ý±¨¾¯
+	GFCMD_GET_ALARM_INFO,			//36.»ñÈ¡±¨¾¯×´Ì¬ºÍ¼ÌµçÆ÷×´Ì¬
+	GFCMD_SET_TW2824,				//37.ÉèÖÃ¶à»­ÃæÐ¾Æ¬²ÎÊý(±£Áô)
+	GFCMD_SET_SAVE_PARAM,			//38.ÉèÖÃ±£´æ²ÎÊý
+	GFCMD_GET_USERINFO,				//39.»ñÈ¡µ±Ç°µÇÂ½µÄÓÃ»§ÐÅÏ¢
+	GFCMD_GET_DDNS,					//40.»ñÈ¡DDNS
+	GFCMD_SET_DDNS,					//41.ÉèÖÃDDNS
+	GFCMD_GET_CAPTURE_PIC,			//42.Ç°¶Ë×¥ÅÄ
+	GFCMD_GET_SENSOR_CAP,			//43.»ñÈ¡´¥·¢×¥ÅÄÉèÖÃ
+	GFCMD_SET_SENSOR_CAP,			//44.ÉèÖÃ´¥·¢×¥ÅÄÉèÖÃ
+	GFCMD_GET_EXTINFO,				//45.»ñÈ¡À©Õ¹ÅäÖÃ
+	GFCMD_SET_EXTINFO,				//46.ÉèÖÃÀ©Õ¹ÅäÖÃ
+	GFCMD_GET_USERDATA,				//47.»ñÈ¡ÓÃ»§ÅäÖÃ
+	GFCMD_SET_USERDATA,				//48.ÉèÖÃÓÃ»§ÅäÖÃ
+	GFCMD_GET_NTP,					//49.»ñÈ¡NTPÅäÖÃ
+	GFCMD_SET_NTP,					//50.ÉèÖÃNTPÅäÖÃ
+	GFCMD_GET_UPNP,					//51.»ñÈ¡UPNPÅäÖÃ
+	GFCMD_SET_UPNP,					//52.ÉèÖÃUPNPÅäÖÃ
+	GFCMD_GET_MAIL,					//53.»ñÈ¡MAILÅäÖÃ
+	GFCMD_SET_MAIL,					//54.ÉèÖÃMAILÅäÖÃ
+	GFCMD_GET_ALARMNAME,			//55.»ñÈ¡±¨¾¯ÃûÅäÖÃ
+	GFCMD_SET_ALARMNAME,			//56.ÉèÖÃ±¨¾¯ÃûÅäÖÃ
+	GFCMD_GET_WFNET,				//57.»ñÈ¡ÎÞÏßÍøÂçÅäÖÃ
+	GFCMD_SET_WFNET,				//58.ÉèÖÃÎÞÏßÍøÂçÅäÖÃ
+	GFCMD_GET_SEND_DEST,			//59.ÉèÖÃÊÓÆµ¶¨Ïò·¢ËÍÄ¿±ê»ú
+	GFCMD_SET_SEND_DEST,			//60.ÉèÖÃÊÓÆµ¶¨Ïò·¢ËÍÄ¿±ê»ú
+	GFCMD_GET_AUTO_RESET,			//61.È¡µÃ¶¨Ê±ÖØÐÂ×¢²á
+	GFCMD_SET_AUTO_RESET,			//62.ÉèÖÃ¶¨Ê±ÖØÐÂ×¢²á
+	GFCMD_GET_REC_SCHEDULE,			//63.È¡µÃÂ¼Ïñ²ßÂÔ
+	GFCMD_SET_REC_SCHEDULE,			//64.ÉèÖÃÂ¼Ïñ²ßÂÔ
+	GFCMD_GET_DISK_INFO,			//65.È¡µÃ´ÅÅÌÐÅÏ¢
+	GFCMD_SET_MANAGE,				//66.ÉèÖÃÃüÁîºÍ²Ù×÷
+	GFCMD_GET_CMOS_REG,				//67.È¡µÃCMOS²ÎÊý
+	GFCMD_SET_CMOS_REG,				//68.ÉèÖÃCMOS²ÎÊý
+	GFCMD_SET_SYSTEM_CMD,			//69.ÉèÖÃÖ´ÐÐÃüÁî
+	GFCMD_SET_KEYFRAME_REQ,			//70.ÉèÖÃ¹Ø¼üÖ¡ÇëÇó
+	GFCMD_GET_CONFIGENCPAR,			//71.È¡µÃÊÓÆµ²ÎÊý
+	GFCMD_SET_CONFIGENCPAR,			//72.ÉèÖÃÊÓÆµ²ÎÊý
+	//--------------------------
+	GFCMD_GET_ALL_PARAMETER_NEW,	//73.»ñÈ¡ËùÓÐ²ÎÊý
+	GFCMD_FING_LOG,					//74.²éÕÒÈÕÖ¾(²éÑ¯·½Ê½:0£­È«²¿£¬1£­°´ÀàÐÍ£¬2£­°´Ê±¼ä£¬3£­°´Ê±¼äºÍÀàÐÍ 0xFF-¹Ø±Õ±¾´ÎËÑË÷)
+	GFCMD_GET_LOG,					//75.¶ÁÈ¡²éÕÒµ½µÄÈÕÖ¾	
+	GFCMD_GET_SUPPORT_AV_FMT,		//76.»ñÈ¡Éè±¸Ö§³ÖµÄ±àÂë¸ñÊ½¡¢¿í¸ß¼°ÒôÆµ¸ñÊ½
+	GFCMD_GET_VIDEO_CONFIG_NEW,		//77.ÊÓÆµ²ÎÊý£­new
+	GFCMD_SET_VIDEO_CONFIG_NEW,		//78.
+	GFCMD_GET_VMOTION_CONFIG_NEW,	//79.ÒÆ¶¯±¨¾¯²ÎÊý£­new
+	GFCMD_SET_VMOTION_CONFIG_NEW,	//80.
+	GFCMD_GET_VLOST_CONFIG_NEW,		//81.ÊÓÆµ¶ªÊ§±¨¾¯²ÎÊý£­new
+	GFCMD_SET_VLOST_CONFIG_NEW,		//82.
+	GFCMD_GET_SENSOR_ALARM_NEW,		//83.Ì½Í·±¨¾¯²ÎÊý£­new
+	GFCMD_SET_SENSOR_ALARM_NEW,		//84.
+	GFCMD_GET_NET_ALARM_CONFIG,		//85.ÍøÂç¹ÊÕÏ±¨¾¯²ÎÊý£­new
+	GFCMD_SET_NET_ALARM_CONFIG,		//86.
+	GFCMD_GET_RECORD_CONFIG,		//87.¶¨Ê±Â¼Ïñ²ÎÊý
+	GFCMD_SET_RECORD_CONFIG,		//88.
+	GFCMD_GET_SHOOT_CONFIG,			//89.¶¨Ê±×¥ÅÄ²ÎÊý
+	GFCMD_SET_SHOOT_CONFIG,			//90.
+	GFCMD_GET_FTP_CONFIG,			//91.FTP²ÎÊý
+	GFCMD_SET_FTP_CONFIG,			//92.
+	GFCMD_GET_RF_ALARM_CONFIG,		//93.ÎÞÏß±¨¾¯²ÎÊý
+	GFCMD_SET_RF_ALARM_CONFIG,		//94.
+	GFCMD_GET_EXT_DATA_CONFIG,		//95.ÆäËüÀ©Õ¹²ÎÊý(ÈçÆ½Ì¨ÉèÖÃÆäËü²ÎÊý)
+	GFCMD_SET_EXT_DATA_CONFIG,		//96.
+	GFCMD_GET_FORMAT_PROCESS,		//97.»ñÈ¡Ó²ÅÌ¸ñÊ½»¯½ø¶È
+	GFCMD_GET_PING_CONFIG,			//98.PING ÉèÖÃ»ñÈ¡
+	GFCMD_SET_PING_CONFIG,			//99.PING ÉèÖÃÉèÖÃ
+
+	//½âÂëÆ÷ÃüÁî
+	DDCMD_GET_ALL_PARAMETER = 100,	//»ñÈ¡½âÂëÆ÷ËùÓÐÉèÖÃ
+	DDCMD_GET_TIME,					//»ñÈ¡ÏµÍ³Ê±¼ä
+	DDCMD_SET_TIME,					//ÉèÖÃÏµÍ³Ê±¼ä
+	DDCMD_GET_SYS_CONFIG,			//»ñÈ¡ÏµÍ³ÅäÖÃ
+	DDCMD_SET_SYS_CONFIG,			//ÉèÖÃÏµÍ³ÅäÖÃ
+	DDCMD_GET_NET_CONFIG,			//»ñÈ¡ÍøÂçÅäÖÃ
+	DDCMD_SET_NET_CONFIG,			//ÉèÖÃÍøÂçÅäÖÃ
+	DDCMD_GET_COM_CONFIG,			//»ñÈ¡´®¿ÚÅäÖÃ
+	DDCMD_SET_COM_CONFIG,			//ÉèÖÃ´®¿ÚÅäÖÃ
+	DDCMD_GET_VIDEO_CONFIG,			//»ñÈ¡ÊÓÆµÅäÖÃ
+	DDCMD_SET_VIDEO_CONFIG,			//ÉèÖÃÊÓÆµÅäÖÃ
+	DDCMD_GET_ALARM_OPT,			//»ñÈ¡±¨¾¯Ñ¡Ïî
+	DDCMD_SET_ALARM_OPT,			//ÉèÖÃ±¨¾¯Ñ¡Ïî
+	DDCMD_GET_USER_INFO,			//»ñÈ¡ÓÃ»§ÉèÖÃÐÅÏ¢
+	DDCMD_SET_USER_INFO,			//ÉèÖÃÓÃ»§ÉèÖÃÐÅÏ¢
+	DDCMD_GET_ALARM_RECORD,			//»ñÈ¡±¨¾¯¼ÇÂ¼ÐÅÏ¢
+	DDCMD_GET_ADRRESS_BOOK,			//»ñÈ¡µØÖ·±¡ÅäÖÃ
+	DDCMD_SET_ADRRESS_BOOK,			//ÉèÖÃµØÖ·±¡ÅäÖÃ
+	DDCMD_SET_COMM,					//ÉèÖÃ·¢ËÍ´®¿ÚÊý¾Ý
+	DDCMD_SET_CMD,					//ÉèÖÃÍ¸Ã÷µÄÃüÁî
+	DDCMD_GET_YUNTAI_INFO,			//»ñÈ¡ÔÆÌ¨ÐÅÏ¢
+	DDCMD_GET_YUNTAI_CONFIG,		//»ñÈ¡ÔÆÌ¨ÅäÖÃ
+	DDCMD_SET_YUNTAI_CONFIG,		//ÉèÖÃÔÆÌ¨ÅäÖÃ
+	DDCMD_GET_ONELINK_ADDR,			//»ñÈ¡½âÂëÆ÷µ¥Â·Á¬½ÓµÄÐÅÏ¢
+	DDCMD_SET_ONELINK_ADDR,			//ÉèÖÃ½âÂëÆ÷µ¥Â·Á¬½ÓµÄÐÅÏ¢
+	DDCMD_GET_CYCLELINK_ADDR,		//»ñÈ¡½âÂëÆ÷Ñ­»·Á¬½ÓµÄÐÅÏ¢
+	DDCMD_SET_CYCLELINK_ADDR,		//ÉèÖÃ½âÂëÆ÷Ñ­»·Á¬½ÓµÄÐÅÏ¢
+	DDCMD_GET_DDNS,					//»ñÈ¡DDNS
+	DDCMD_SET_DDNS,					//ÉèÖÃDDNS
+	
+	GFCMD_GET_VPN_CONFIG = 200,
+	GFCMD_SET_VPN_CONFIG,
+	GFCMD_GET_3G_CONFIG,
+	GFCMD_SET_3G_CONFIG,
+	GFCMD_GET_GPS_CONFIG,
+	GFCMD_SET_GPS_CONFIG,
+		
+	GFCMD_GET_VERSION_STRING = 400,	//3518Õë¶ÔÆ½Ì¨£¬»ñÈ¡°æ±¾×Ö·û´®
+	
+	NETCMD_GET_VI_SENSOR=1000,
+	NETCMD_SET_VI_SENSOR,
+	NETCMD_GET_VI_SCENE,
+	NETCMD_SET_VI_SCENE,
+	NETCMD_GET_VI_CFG,
+	NETCMD_SET_VI_CFG,
+	NETCMD_GET_DOME_PTZ_CFG,
+	NETCMD_SET_DOME_PTZ_CFG,	
+	NETCMD_GET_DOME_PRESET_CFG,
+	NETCMD_SET_DOME_PRESET_CFG,	
+	NETCMD_MAX_CONFIG,	
+}GFCMD_NET;
+
+typedef enum _NET_MSG_NOTIFY
+{
+	MSG_LOGIN_LINK,
+	MSG_LOGIN_UNLINK,
+	MSG_PREVIEW_LINK,
+	MSG_PREVIEW_UNLINK,
+	MSG_TALK_LINK,
+	MSG_TALK_UNLINK,
+	MSG_BROADCAST_LINK,
+	MSG_BROADCAST_UNLINK,
+	MSG_FILE_LINK,
+	MSG_FILE_UNLINK,
+	MSG_PIC_LINK,
+	MSG_PIC_UNLINK,
+	MSG_PIC_REQUEST,
+	MSG_CENTER_LINK,
+	MSG_CENTER_UNLINK,
+}NET_MSG_NOTIFY;
+
+unsigned long GFSNet_WriteFrame(int nChannelNo,const char *pFrameData,const char *pAudioData);
+
+
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

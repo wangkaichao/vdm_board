@@ -1,0 +1,98 @@
+
+.PHONY: all clean
+
+MKDIR = mkdir
+RM = rm
+RMFLAGS = -fr
+
+CC = arm-hisiv100nptl-linux-gcc
+
+DIR_EXES = $(ROOT)/build/exes
+DIR_LIBS = $(ROOT)/build/libs
+DIR_DEPS = deps
+DIR_OBJS = objs
+DIRS = $(DIR_OBJS) $(DIR_EXES) $(DIR_DEPS) $(DIR_LIBS)
+RMS = $(DIR_OBJS) $(DIR_DEPS)
+
+#LIB, EXE, 可能为空
+ifneq ("$(EXE)", "")
+EXE := $(addprefix $(DIR_EXES)/, $(EXE))
+RMS += $(EXE)
+endif
+
+ifneq ("$(LIB)", "")
+LIB := $(addprefix $(DIR_LIBS)/, $(LIB))
+RMS += $(LIB)
+endif
+
+#处理的都是当前目录的文件
+SRCS = $(wildcard *.c)
+SRCS1 = $(wildcard *.s)
+OBJS = $(SRCS:.c=.o)
+OBJS += $(SRCS1:.s=.o)
+OBJS := $(addprefix $(DIR_OBJS)/, $(OBJS))	#./objs/*.o
+DEPS = $(SRCS:.c=.dep)
+DEPS := $(addprefix $(DIR_DEPS)/, $(DEPS))	#./deps/*.dep
+
+#如果DIR_EXES空，DEP_DIR_XXX = ""
+#如果DIR_EXES不空，DEP_DIR_XXX不存在
+ifeq ("$(wildcard $(DIR_EXES))", "")
+DEP_DIR_EXES := $(DIR_EXES)
+endif
+ifeq ("$(wildcard $(DIR_LIBS))", "")
+DEP_DIR_LIBS := $(DIR_LIBS)
+endif
+ifeq ("$(wildcard $(DIR_OBJS))", "")
+DEP_DIR_OBJS := $(DIR_OBJS)
+endif
+ifeq ("$(wildcard $(DIR_DEPS))", "")
+DEP_DIR_DEPS := $(DIR_DEPS)
+endif
+
+all: $(EXE) $(LIB)
+
+ifneq ($(MAKECMDGOALS), clean)include $(DEPS)
+endif
+
+#INCLUDE_DIRS = $(ROOT)/libipnc/inc ../inc $(LINUX_INC) $(LINUX_SRC)/../../../mpp/extdrv/gpio
+ifneq ($(INCLUDE_DIRS), "")
+INCLUDE_DIRS := $(strip $(INCLUDE_DIRS)) 			#去掉开头和结尾的空格
+INCLUDE_DIRS := $(addprefix -I, $(INCLUDE_DIRS))	#每个字段加 -I
+endif
+
+#LINK_LIBS = brkeyboard rtspserver ipc rtsp pthread m stdc++ raj $(MPI_LIBS) $(JPEG_LIBS) $(AUDIO_LIBS)
+ifneq ($(LINK_LIBS), "")
+LINK_LIBS := $(strip $(LINK_LIBS)) 	#去掉开头和结尾的空格
+
+LIB_FILTERED := $(addsuffix %, $(addprefix lib, $(LINK_LIBS)))	#加lib前缀，加%后缀，如libipc%
+LIB_ALL := $(notdir $(wildcard $(DIR_LIBS)/*))					#以空格分隔展开所有文件名，notdir去除字符串里面的目录信息，只保留文件名
+$(eval DEP_LIBS = $(filter $(LIB_FILTERED), $(LIB_ALL))) 		#在LINK_LBIS的libxxx%模式中，只保留匹配$(ROOT)/build/libs/目录下的libxxx.a，
+DEP_LIBS := $(addprefix $(DIR_LIBS)/, $(DEP_LIBS))				#libxxx.a => $(ROOT)/build/libs/libxxx.a
+
+LINK_LIBS := $(addprefix -l, $(LINK_LIBS))
+endif
+
+$(DIRS):
+	$(MKDIR) $@		#创建目录
+	
+$(EXE): $(DEP_DIR_EXES) $(OBJS) $(DEP_LIBS)								#$(ROOT)/build/libs/libxxx.a中，exe用到的.a文件，有更新时需要重新编译
+	$(CC) -L$(DIR_LIBS) -o $@ $(filter %.o, $^) $(LINK_LIBS)
+	
+$(LIB): $(DEP_DIR_LIBS) $(OBJS)											#要编译的.a文件
+	$(AR) $(ARFLAGS) $@ $(filter %.o, $^)
+
+$(DIR_OBJS)/%.o: $(DEP_DIR_OBJS) %.c									#*.o
+	$(CC) $(INCLUDE_DIRS) -o $@ -c $(filter %.c, $^) $(filter %.s, $^)
+
+$(DIR_DEPS)/%.dep: $(DEP_DIR_DEPS) %.c %s								#没用上
+	@echo "Create $@..."
+	@set -e;\
+	$(RM) $(RMFLAGS) $@.tmp;\
+	$(CC) $(INCLUDE_DIRS) -E -MM $(filter %.c, $^) > $@.tmp ;\
+	sed 's, \(.*\)\.o[ :]*,objs/\l.o $@: , g' < $@.tmp > $@ ;\
+	$(RM) $(RMFLAGS) $@.tmp
+	
+clean:
+	@echo $(MAKECMDGOALS)...
+	@echo $(ROOT)........root
+	$(RM) $(RMFLAGS) $(RMS)
