@@ -458,6 +458,8 @@ void processOSD(MSA_HANDLE hd, char *buf)
 #define MAX_PIC_LEN     (2 * (ZIFU_W) * (ZIFU_H) * (ZIFU_N) + PRE_BYTE_ADD)
 #define MAX_CHAR_NUM	(ZIFU_N * 2 + PRE_BYTE_ADD)
 
+// 1080p：18行，一行 80字符/40汉字
+// ascii: len = 40 * 2 * 18。为了有缓冲区间，len * 2 + 40
 static char osd_buf[40 * 2 * 18 * 2 + 40];
 static char osd_buf_tmp[40 * 2 * 18 * 2 + 40];
 static int start_i = 0;
@@ -593,19 +595,23 @@ void *osd_pic_receive(void *parg)
 				while (1) {
 					int pos = 0;
 					unsigned int head = 0;
+
 					for (j = 0; j < 4; j++) {
 						int tmp_pos = (start_i + pos + j) % sizeof(osd_buf);
+
 						if (tmp_pos == end_i) {
-						    printf("[%s]-%d err osd buf over_2.\n", __FUNCTION__, __LINE__);
+						    //printf("[%s]-%d err osd buf over_2.\n", __FUNCTION__, __LINE__);
 						    break;
 						}
 						head <<= 8;
 						head |= (osd_buf[tmp_pos] & 0xFF);
 					}
+
 					if (j != 4) {
-					    printf("[%s]-%d: err_1!\n", __FUNCTION__, __LINE__);
+					    //printf("[%s]-%d: err_1!\n", __FUNCTION__, __LINE__);
 					    break;
 					}
+
 					pos += 4;
 
 					if (head != 0xFFFFFFFF) {
@@ -639,16 +645,21 @@ void *osd_pic_receive(void *parg)
 					
 					for (j = 0; j < w; j++) {
 						int tmp_pos = (start_i + pos + j) % sizeof(osd_buf);
-						if (tmp_pos == end_i)  break;
-						pMsg_buf[16 + j] = osd_buf[tmp_pos];
+						
+                        if (tmp_pos == end_i)
+                            break;
+						
+                        pMsg_buf[16 + j] = osd_buf[tmp_pos];
 					}
+
 					if (j != w) {
 					    printf("[%s]-%d: err_4!\n", __FUNCTION__, __LINE__);
 					    break;
 					}
+
 					pos += w;
 					start_i = (start_i + pos) % sizeof(osd_buf);
-					//printf("s=%d,e=%d\n", start_i, end_i);
+					//prdintf("s=%d,e=%d\n", start_i, end_i);
 					
 					if (get_stream_video_width(stream_id) == 0) {
 					    printf("[%s]-%d: err_5!\n", __FUNCTION__, __LINE__);
@@ -661,11 +672,13 @@ void *osd_pic_receive(void *parg)
 					w = get_string(string_char, (char *)(pMsg_buf + PRE_BYTE_ADD), w);				
 					*((int *)pMsg_buf + 2) = w * ZIFU_W;
 					*((int *)pMsg_buf + 3) = ZIFU_H;
+
                     y = (y - 1) *(ZIFU_H + HIGH_STEP) + HIGH_BASE;
                     if (y > get_stream_video_heigt(stream_id) - ZIFU_H) {
                         printf("[%s]-%d: err_6!\n", __FUNCTION__, __LINE__);
                         break;
                     }
+
 					lprint((char *)(pMsg_buf + PRE_BYTE_ADD), string_char, NULL, w * ZIFU_W, 0, 0, char_mod_buf);
 					processOSD(NULL, pMsg_buf);	
 				}
