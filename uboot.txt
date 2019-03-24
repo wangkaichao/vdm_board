@@ -1,0 +1,36 @@
+root
+abc.123
+
+hisilicon # pri
+bootdelay=1
+baudrate=115200
+bootfile="uImage"
+bootargs=mem=174M console=ttyAMA0,115200 root=/dev/mtdblock2 rootfstype=jffs2 mtdparts=hi_sfc:1M(boot),4M(kernel),11M(rootfs)
+ethaddr=00-10-85-18-40-67
+jpeg_addr=0x82000000
+vobuf=0x91000000
+jpeg_size=0x6127
+bootcmd=sf probe 0;sf read 82000000 4d0000 30000;decjpg; setvobg 0 0x00;startvo 0 0x24 13;startgx 0 0x91000000 1440 40 12 720 576; startvo 2 1 0;startgx 2 0x91000000 1440 0 0 720 576;sf probe 0;sf read 0x82000000 0x100000 0x400000;bootm 0x82000000
+filesize=45F10
+fileaddr=82000000
+gatewayip=192.168.1.1
+netmask=255.255.255.0
+ipaddr=192.168.1.2
+serverip=192.168.1.64
+stdin=serial
+stdout=serial
+stderr=serial
+verify=n
+ver=U-Boot 2010.06 (Jul 08 2014 - 09:11:54)
+
+Environment size: 713/262140 bytes
+
+
+setenv ipaddr '192.168.1.62';setenv serverip '192.168.1.231';setenv netmask '255.255.255.0';setenv gatewayip 192.168.1.1;sav
+------------------------------------------------------------------------------------------------------------------------------------------
+sf probe 0; mw.b 82000000 ff 1000000; sf read 82000000 0 1000000; tftp 82000000 16M_hi3535_vdm_2017-06-09.img 1000000
+sf probe 0; mw.b 82000000 ff 1000000; tftp 82000000 16M_hi3535_vdm_2017-08-15.img; sf erase 0 1000000; sf write 82000000 0 1000000;
+------------------------------------------------------------------------------------------------------------------------------------------
+sf probe 0;mw.b 82000000 ff 100000;tftp 82000000 u-boot_hi3535_vdm.bin; sf erase 0 100000; sf write 82000000 0 100000; sav
+sf probe 0;mw.b 82000000 ff 400000;tftp 82000000 uImage_hi3535_vdm; sf erase 100000 400000; sf write 82000000 100000 400000;
+sf probe 0;mw.b 82000000 ff b00000;tftp 82000000 rootfs_hi3535_vdm.jffs2; sf erase 500000 b00000; sf write 82000000 500000 b00000;
